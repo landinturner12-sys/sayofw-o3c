@@ -1,0 +1,10 @@
+build/
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.dSYM/
+.DS_Store
+node_modules/
