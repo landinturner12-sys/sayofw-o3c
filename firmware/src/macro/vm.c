@@ -110,11 +110,18 @@ bool macro_vm_tick(macro_vm_t *vm, uint32_t now_ms)
         vm->pc++;
         break;
     case OP_LOOP_START:
-        if (vm->loop_sp < VM_LOOP_STACK_DEPTH) {
-            vm->loop_stack[vm->loop_sp].pc_start = vm->pc;
-            vm->loop_stack[vm->loop_sp].remaining = insn->arg1;
-            vm->loop_sp++;
+        if (vm->loop_sp >= VM_LOOP_STACK_DEPTH) {
+            /* F11: Set an error state instead of silently swallowing
+             * the LOOP_START. The unmatched LOOP_END later would have
+             * corrupted the program semantics. The host is expected to
+             * check `loop_sp` at upload (in h_macro_define) and reject
+             * over-nested macros before this ever runs. */
+            vm->state = VM_ERROR;
+            return false;
         }
+        vm->loop_stack[vm->loop_sp].pc_start = vm->pc;
+        vm->loop_stack[vm->loop_sp].remaining = insn->arg1;
+        vm->loop_sp++;
         vm->pc++;
         break;
     case OP_LOOP_END:

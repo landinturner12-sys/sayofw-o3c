@@ -1,0 +1,28 @@
+{
+  "name": "SayoFW O3C",
+  "version": "v0.1.0",
+  "description": "Custom open-source firmware for Sayobot O3C — macro VM, display compositor, HID protocol",
+  "home_assistant_domain": null,
+  "new_install_prompt_erase": false,
+  "builds": [
+    {
+      "chipFamily": "CH32V307",
+      "parts": [
+        {
+          "path": "firmware/sayofw_o3c.bin",
+          "offset": 16384
+        }
+      ]
+    }
+  ],
+  "firmware": {
+    "binary": "firmware/sayofw_o3c.bin",
+    "target": "CH32V307",
+    "flash_address": "0x08004000",
+    "mcu": "WCH CH32V307 (RISC-V RV32IMAFCX)",
+    "usb_vid": "0x8089",
+    "usb_pid": "0x0009",
+    "bootloader_vid": "0x4348",
+    "bootloader_pid": "0x55e0"
+  }
+}

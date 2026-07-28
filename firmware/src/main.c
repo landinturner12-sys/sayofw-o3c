@@ -21,15 +21,19 @@ int main(void)
 {
     sys_init();
 
-    /* Wire protocol → compositor. The protocol dispatcher will, on
-     * CMD_V3_DISPLAY_TEXT etc., mutate the compositor directly. */
-    extern void protocol_init(void);
-    extern void protocol_pump(void);
-    protocol_init();
-
+    /* display_init must run BEFORE protocol_init: it calls
+     * protocol_set_compositor(&g_compositor). Any HID packet that
+     * arrives between protocol_init and display_init would otherwise
+     * be dispatched with a NULL compositor and silently no-op display
+     * commands. */
     extern void display_init(void);
     extern void display_flush(void);
     display_init();
+
+    /* Now safe to wire the protocol dispatcher — it can find g_compositor. */
+    extern void protocol_init(void);
+    extern void protocol_pump(void);
+    protocol_init();
 
     extern void keys_init(key_state_t *s);
     extern void keys_scan(key_state_t *s);

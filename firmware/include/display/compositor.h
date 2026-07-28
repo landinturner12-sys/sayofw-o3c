@@ -31,6 +31,15 @@ typedef enum {
     LAYER_KIND_BITMAP = 3,
 } layer_kind_t;
 
+/* Per-layer bitmap scratch buffer. Sized to cover the maximum supported
+ * 1bpp bitmap: width=128 px (DISPLAY_WIDTH_PX) packed into bytes, height
+ * up to DISPLAY_HEIGHT_PX. The compositor owns this buffer — callers pass
+ * their bitmap data to compositor_set_bitmap() and the bytes are COPIED,
+ * so the caller's buffer can be reused or freed after the call returns. */
+#ifndef DISPLAY_BMP_BUF_BYTES
+#define DISPLAY_BMP_BUF_BYTES ((DISPLAY_WIDTH_PX + 7U) / 8U * DISPLAY_HEIGHT_PX)
+#endif
+
 typedef struct {
     bool        enabled;
     layer_kind_t kind;
@@ -44,7 +53,7 @@ typedef struct {
         struct { char text[DISPLAY_TEXT_CHARS + 1]; } text;
         struct {
             uint16_t w; uint8_t h;
-            const uint8_t *bmp;   /* borrowed; caller owns the storage */
+            uint8_t  bmp[DISPLAY_BMP_BUF_BYTES];   /* owned by the compositor */
             uint16_t bmp_stride;
         } bitmap;
     } u;

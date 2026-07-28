@@ -59,6 +59,11 @@ extern "C" {
 void sys_init(void);
 uint32_t sys_tick_ms(void);
 
+/* Forward declaration so target override can link cleanly without
+ * implicit-declaration warnings. The default (host-test) implementation
+ * is a weak no-op in src/protocol/dispatch.c. */
+void request_bootloader_entry(void);
+
 /* ===== USB hooks (provided by target usb.c, stubbed in host tests) ===== */
 typedef struct {
     uint8_t *buf;

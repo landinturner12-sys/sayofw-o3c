@@ -64,6 +64,10 @@ const uint8_t *storage_get_payload(size_t *out_size);
 extern bool hal_flash_erase(uint32_t addr, uint32_t len);
 extern bool hal_flash_write(uint32_t addr, const uint8_t *src, uint32_t len);
 extern bool hal_flash_read(uint32_t addr, uint8_t *dst, uint32_t len);
+/* F15 (originally `hal_flash_rase_checked` — typo renamed to
+ * `hal_flash_erase_checked`). The weak default delegates to
+ * hal_flash_erase; target overrides may add read-back verification. */
+extern bool hal_flash_erase_checked(uint32_t addr, uint32_t len);
 
 #ifdef __cplusplus
 }

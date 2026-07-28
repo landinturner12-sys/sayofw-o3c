@@ -32,7 +32,11 @@ extern "C" {
 #define OP_MOUSE_MOVE   0x06U  /* arg0=dx (i8), arg1_lo=dy (i8)            */
 #define OP_MOUSE_BTN    0x07U  /* arg0=button mask, arg1=0 release / 1 press*/
 #define OP_DISPLAY_TEXT 0x08U  /* arg0=layer, arg1=text_offset in slot data */
-#define OP_LOOP_START   0x09U  /* arg1=iteration count (0=infinite)         */
+#define OP_LOOP_START   0x09U  /* arg1=iteration count (0=infinite). On the
+                                * wire, 0 means "loop forever" and 1..N
+                                * means "iterate N times". The host
+                                * rejects uploads whose explicit count
+                                * loops a zero-iteration body (F12). */
 #define OP_LOOP_END     0x0AU  /* Jump back to matching LOOP_START          */
 #define OP_HALT         0xFFU  /* Stop execution                            */
 
@@ -55,6 +59,9 @@ typedef enum {
     VM_IDLE = 0,
     VM_RUNNING,
     VM_WAITING,      /* inside OP_DELAY */
+    VM_ERROR,        /* unrecoverable runtime error (F11: loop nesting
+                      * overflow, etc.) — VM is stopped and state must
+                      * be cleared via macro_vm_stop() or a new run(). */
 } vm_state_t;
 
 #define VM_LOOP_STACK_DEPTH 4U

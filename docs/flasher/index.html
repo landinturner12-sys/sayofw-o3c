@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SayoFW Web Flasher — Flash your O3C from the browser</title>
+  <meta name="description" content="Flash SayoFW custom firmware to your Sayobot O3C macropad directly from Chrome/Edge via WebUSB.">
+  <link rel="stylesheet" href="static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⌨️</text></svg>">
+</head>
+<body>
+  <!-- Browser compatibility banner -->
+  <div id="browser-warning" class="banner banner--error" hidden>
+    <span class="banner__icon">⚠️</span>
+    <span class="banner__text">
+      <strong>Unsupported browser.</strong> WebUSB requires <strong>Chrome 61+</strong> or <strong>Edge 79+</strong> on desktop.
+      Firefox and Safari are not supported.
+    </span>
+  </div>
+
+  <header class="header">
+    <div class="container">
+      <div class="header__brand">
+        <span class="header__icon">⌨️</span>
+        <div>
+          <h1 class="header__title">SayoFW Web Flasher</h1>
+          <p class="header__subtitle">Custom firmware for the Sayobot O3C macropad</p>
+        </div>
+      </div>
+      <div class="header__badges">
+        <span class="badge badge--blue">CH32V307 RISC-V</span>
+        <span class="badge badge--orange" id="badge-version">v0.1.0</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Hero / intro section -->
+    <section class="hero">
+      <h2>Flash firmware to your O3C — no tools required</h2>
+      <p>
+        Connect your Sayobot O3C in bootloader mode and flash SayoFW directly from this page.
+        No drivers, no CLI, no installs — just Chrome/Edge and a USB cable.
+      </p>
+    </section>
+
+    <!-- Steps overview -->
+    <section class="steps" id="steps">
+      <div class="step" data-step="1" id="step-boot">
+        <div class="step__number">1</div>
+        <div class="step__content">
+          <h3>Enter Bootloader Mode</h3>
+          <ol class="step__instructions">
+            <li>Unplug the O3C from USB</li>
+            <li>Hold the <strong>BOOT0</strong> button (small button on PCB)</li>
+            <li>While holding BOOT0, plug in the USB cable</li>
+            <li>Release BOOT0 — device is now in ISP mode</li>
+          </ol>
+          <p class="step__hint">💡 The OLED will stay blank — that's normal in bootloader mode.</p>
+        </div>
+      </div>
+
+      <div class="step step--disabled" data-step="2" id="step-connect">
+        <div class="step__number">2</div>
+        <div class="step__content">
+          <h3>Connect Device</h3>
+          <p>Click the button below. A browser dialog will ask you to select your device.</p>
+          <button id="btn-connect" class="btn btn--primary btn--large" disabled>
+            <span class="btn__icon">🔌</span>
+            Connect &amp; Flash
+          </button>
+          <div id="device-info" class="device-info" hidden>
+            <div class="device-info__row"><span>Chip:</span> <span id="chip-name">—</span></div>
+            <div class="device-info__row"><span>Flash:</span> <span id="chip-flash">—</span></div>
+            <div class="device-info__row"><span>UID:</span> <span id="chip-uid" class="mono">—</span></div>
+            <div class="device-info__row"><span>Bootloader:</span> <span id="chip-bl">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step step--disabled" data-step="3" id="step-flash">
+        <div class="step__number">3</div>
+        <div class="step__content">
+          <h3>Flash Firmware</h3>
+          <div id="firmware-select" class="firmware-select" hidden>
+            <div class="firmware-card">
+              <div class="firmware-card__header">
+                <span class="firmware-card__name" id="fw-name">SayoFW O3C</span>
+                <span class="badge badge--green" id="fw-version">v0.1.0</span>
+              </div>
+              <p class="firmware-card__desc" id="fw-desc">Custom open-source firmware with macro VM, display compositor, and HID protocol.</p>
+              <div class="firmware-card__meta">
+                <span id="fw-size">—</span> · <span id="fw-target">CH32V307</span> · <span id="fw-addr">@ 0x08004000</span>
+              </div>
+            </div>
+            <div class="firmware-actions">
+              <button id="btn-flash" class="btn btn--accent btn--large">
+                <span class="btn__icon">⚡</span>
+                Flash Firmware
+              </button>
+              <label class="btn btn--secondary">
+                <span class="btn__icon">📁</span>
+                Use Custom .bin
+                <input type="file" id="file-input" accept=".bin" hidden>
+              </label>
+            </div>
+          </div>
+
+          <!-- Progress UI -->
+          <div id="flash-progress" class="progress-panel" hidden>
+            <div class="progress-panel__status">
+              <span id="progress-icon" class="progress-panel__icon spinner">⏳</span>
+              <span id="progress-label">Preparing…</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-bar__fill" id="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="progress-bar__text">
+              <span id="progress-detail">0%</span>
+              <span id="progress-speed"></span>
+            </div>
+          </div>
+
+          <!-- Result UI -->
+          <div id="flash-result" hidden>
+            <div id="result-success" class="result result--success" hidden>
+              <span class="result__icon">✅</span>
+              <h4>Flash Complete!</h4>
+              <p>Firmware written and verified. Unplug and replug your O3C to start the new firmware.</p>
+            </div>
+            <div id="result-error" class="result result--error" hidden>
+              <span class="result__icon">❌</span>
+              <h4>Flash Failed</h4>
+              <p id="error-message">An error occurred.</p>
+              <button id="btn-retry" class="btn btn--secondary">Retry</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Console log -->
+    <section class="console-section">
+      <div class="console-header">
+        <h3>📋 Log</h3>
+        <button id="btn-clear-log" class="btn btn--small btn--ghost">Clear</button>
+      </div>
+      <div id="console" class="console" role="log" aria-live="polite"></div>
+    </section>
+
+    <!-- Info cards -->
+    <section class="info-cards">
+      <div class="info-card">
+        <h3>🌐 Supported Browsers</h3>
+        <ul>
+          <li><strong>Chrome 61+</strong> (Windows, macOS, Linux, ChromeOS)</li>
+          <li><strong>Edge 79+</strong> (Windows, macOS)</li>
+          <li><strong>Opera 48+</strong></li>
+        </ul>
+        <p class="info-card__note">Firefox and Safari do not support WebUSB.</p>
+      </div>
+      <div class="info-card">
+        <h3>🔧 Driver Notes</h3>
+        <ul>
+          <li><strong>Windows:</strong> WinUSB driver required — <a href="https://zadig.akeo.ie/" target="_blank" rel="noopener">Install via Zadig</a></li>
+          <li><strong>macOS:</strong> No driver needed</li>
+          <li><strong>Linux:</strong> Add udev rule for VID <code>4348</code></li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h3>🛟 Recovery</h3>
+        <p>Can't brick it — if firmware has invalid MD5, the bootloader stays in ISP mode automatically.
+           Just re-flash.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>SayoFW is open source under the MIT License.
+        <a href="https://github.com/ankur-sayofw/freya-control" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/ankur-sayofw/freya-control/blob/main/README.md" target="_blank" rel="noopener">Documentation</a>
+      </p>
+    </div>
+  </footer>
+
+  <script src="static/js/wch-isp.js"></script>
+  <script src="static/js/main.js"></script>
+</body>
+</html>

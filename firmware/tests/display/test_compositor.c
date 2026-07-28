@@ -91,6 +91,26 @@ static void test_clear_all_layers(void)
     EXPECT(!display_get_pixel(display_get_framebuffer(), 20, 0), "clear: O off");
 }
 
+/* F2 regression: the compositor must COPY the bitmap bytes — storing the
+ * caller's pointer becomes a dangling reference once the USB RX buffer is
+ * recycled. The test simulates that by zeroing the source buffer after
+ * the call and then verifying the layer still renders correctly. */
+static void test_bitmap_layer_copies_data(void)
+{
+    compositor_t c;
+    compositor_init(&c);
+
+    /* 8x8 bitmap (1 byte per row, 8 rows = 8 bytes). All pixels on. */
+    uint8_t bmp[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+    EXPECT(compositor_set_bitmap(&c, 0, 0, 0, bmp, 8, 8, 1), "set bitmap layer");
+    /* Simulate the USB RX buffer being recycled: zero the source. */
+    memset(bmp, 0, sizeof(bmp));
+    /* Repaint must still produce the correct pixels. */
+    compositor_repaint(&c);
+    EXPECT(display_get_pixel(display_get_framebuffer(), 0, 0), "bitmap: pixel (0,0) on after source zeroed");
+    EXPECT(display_get_pixel(display_get_framebuffer(), 7, 7), "bitmap: pixel (7,7) on after source zeroed");
+}
+
 int main(void)
 {
     printf("=== compositor tests ===\n");
@@ -99,6 +119,7 @@ int main(void)
     test_layer_overwrite();
     test_dirty_rect_after_layer_change();
     test_clear_all_layers();
+    test_bitmap_layer_copies_data();
 
     if (g_failures == 0) {
         printf("\nAll compositor tests passed.\n");

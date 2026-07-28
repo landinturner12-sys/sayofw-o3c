@@ -121,16 +121,29 @@ static void h_display_text(const cmd_view_t *v)
 
 static void h_display_rect(const cmd_view_t *v)
 {
-    if (g_compositor == NULL || v->data_len < 6U) {
+    /* F7: payload is now 10 bytes:
+     *   [0]  layer
+     *   [1..2]  x (u16 LE)
+     *   [3..4]  y (u16 LE, low byte is the row used by SSD1306 page mode)
+     *   [5..6]  width (u16 LE)
+     *   [7..8]  height (u16 LE, low byte is the page count used in flush)
+     *   [9]  on (0 = clear, non-zero = fill)
+     * Reject short payloads rather than silently misinterpret. */
+    if (g_compositor == NULL || v->data_len < 10U) {
         send_resp(CMD_V3_DISPLAY_RECT, v->index, NULL, 0U);
         return;
     }
     uint8_t  layer = v->data[0U];
     uint16_t x     = (uint16_t)((uint16_t)v->data[1U] | ((uint16_t)v->data[2U] << 8));
     uint16_t y     = (uint16_t)((uint16_t)v->data[3U] | ((uint16_t)v->data[4U] << 8));
-    bool     on    = (v->data[5U] != 0U);
-    (void)compositor_set_fill(g_compositor, layer, x, (uint8_t)y, 1U, 1U, on);
-    /* (For a real rect, payload should be 7B: layer, x_lo, x_hi, y_lo, y_hi, w, h, on. */
+    uint16_t w     = (uint16_t)((uint16_t)v->data[5U] | ((uint16_t)v->data[6U] << 8));
+    uint16_t h     = (uint16_t)((uint16_t)v->data[7U] | ((uint16_t)v->data[8U] << 8));
+    bool     on    = (v->data[9U] != 0U);
+    if (w == 0U || h == 0U) {
+        send_resp(CMD_V3_DISPLAY_RECT, v->index, NULL, 0U);
+        return;
+    }
+    (void)compositor_set_fill(g_compositor, layer, x, (uint8_t)y, w, (uint8_t)h, on);
     send_resp(CMD_V3_DISPLAY_RECT, v->index, NULL, 0U);
 }
 
@@ -294,7 +307,15 @@ void protocol_dispatch(const uint8_t *pkt, uint16_t len)
 {
     if (pkt == NULL || len < HID_OFF_CMDS) { return; }
     if (!codec_verify_v3(pkt, len)) {
-        /* Optional: send a NAK with RESP_ERR_CHECKSUM. We stay silent. */
+        /* F16: reply with RESP_ERR_CHECKSUM instead of silently dropping.
+         * If the device is the same buffer-corruption source, hid_send()
+         * will return false and we degrade gracefully. */
+        uint8_t code = RESP_ERR_CHECKSUM;
+        g_tx_len = (uint16_t)codec_build_response(g_tx_buf, sizeof(g_tx_buf),
+                                                  0x00U, /* id: reserved */
+                                                  0x00U, /* index */
+                                                  &code, 1U);
+        if (g_tx_len > 0U) { (void)hid_send(g_tx_buf, g_tx_len); }
         return;
     }
     const uint8_t *cursor = &pkt[HID_OFF_CMDS];

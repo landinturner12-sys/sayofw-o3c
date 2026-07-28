@@ -91,14 +91,28 @@ bool compositor_set_bitmap(compositor_t *c, uint8_t idx,
                            uint16_t stride)
 {
     if (c == NULL || idx >= DISPLAY_MAX_LAYERS) { return false; }
+    if (bmp == NULL || w == 0U || h == 0U) { return false; }
     c->layers[idx].enabled = true;
     c->layers[idx].kind    = LAYER_KIND_BITMAP;
     c->layers[idx].x = x;
     c->layers[idx].y = y;
-    c->layers[idx].u.bitmap.bmp       = bmp;
     c->layers[idx].u.bitmap.w         = w;
     c->layers[idx].u.bitmap.h         = h;
     c->layers[idx].u.bitmap.bmp_stride = stride;
+    /* Copy the bitmap into compositor-owned storage. The previous
+     * implementation stored the caller's pointer, which becomes a
+     * dangling reference once the USB RX buffer is recycled (use-after-
+     * free on every repaint). See code review finding F2. */
+    uint16_t row_bytes = (uint16_t)((w + 7U) / 8U);
+    size_t   total     = (size_t)row_bytes * (size_t)h;
+    if (total > sizeof(c->layers[idx].u.bitmap.bmp)) {
+        /* Truncate to fit; the caller sent too much. We still accept and
+         * render whatever fits, rather than fail the whole packet. */
+        total = sizeof(c->layers[idx].u.bitmap.bmp);
+    }
+    memcpy(c->layers[idx].u.bitmap.bmp, bmp, total);
+    /* store effective stride (row_bytes) so the renderer can rely on it */
+    c->layers[idx].u.bitmap.bmp_stride = row_bytes;
     expand_dirty(c, x, y, (uint16_t)(x + w - 1U), (uint8_t)(y + h - 1U));
     return true;
 }
@@ -182,9 +196,9 @@ void compositor_take_dirty(compositor_t *c,
 void compositor_clear_host_layers(compositor_t *c)
 {
     if (c == NULL) { return; }
-    /* "Host" layers are the upper half (8..15); lower half is owned by
-     * on-device features (status icons). The split is configurable per
-     * device; for the O3C we treat all 16 as host-pushable. */
+    /* For the O3C all 16 layers are host-pushable; there are no
+     * reserved device-side layers. (If a future device allocates
+     * device-side layers in 0..7, change DISPLAY_HOST_LAYER_START.) */
     for (uint8_t i = 0U; i < DISPLAY_MAX_LAYERS; i++) {
         (void)compositor_disable(c, i);
     }

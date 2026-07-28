@@ -1,0 +1,63 @@
+# Deploy SayoFW Web Flasher to GitHub Pages
+# Triggers on push to main; serves docs/flasher/ as the site root.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # manual trigger
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment at a time
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # F6: refuse to deploy a site that still ships the placeholder
+      # firmware binary. The shipped docs/flasher/firmware/sayofw_o3c.bin
+      # is a 1 KB marker file used only so the GitHub Pages site builds
+      # before the firmware does. If we deploy it, users will brick
+      # their devices flashing it. This gate fails the workflow (and
+      # therefore prevents the Pages publish) until a real
+      # `firmware/build/sayofw_o3c.bin` is committed to the repo and
+      # copied into place.
+      - name: Reject placeholder firmware binary
+        run: |
+          BIN=docs/flasher/firmware/sayofw_o3c.bin
+          if [ ! -f "$BIN" ]; then
+            echo "::error::$BIN missing — refusing to deploy."
+            exit 1
+          fi
+          head -c 26 "$BIN" | grep -q '^SAYOFW_PLACEHOLDER' && {
+            echo "::error::$BIN is still the placeholder. Build the firmware and replace it (see docs/BUILD.md)."
+            exit 1
+          }
+          echo "Firmware binary looks real ($(wc -c < "$BIN") bytes) — proceeding."
+
+      # .nojekyll is committed in docs/flasher/ — no extra step needed.
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/flasher
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

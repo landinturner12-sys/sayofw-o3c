@@ -1,0 +1,9 @@
+{
+  "name": "sayofw_o3c",
+  "version": "0.1.0",
+  "target": "CH32V307",
+  "flash_address": "0x08004000",
+  "size_bytes": 1024,
+  "sha256": "placeholder",
+  "note": "This is a placeholder. Replace with actual build output from firmware/build/sayofw_o3c.bin"
+}

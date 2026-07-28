@@ -17,7 +17,7 @@
 __attribute__((weak)) bool hal_flash_erase(uint32_t addr, uint32_t len) { (void)addr; (void)len; return false; }
 __attribute__((weak)) bool hal_flash_write(uint32_t addr, const uint8_t *src, uint32_t len) { (void)addr; (void)src; (void)len; return false; }
 __attribute__((weak)) bool hal_flash_read(uint32_t addr, uint8_t *dst, uint32_t len) { (void)addr; (void)dst; (void)len; return false; }
-__attribute__((weak)) bool hal_flash_rase_checked(uint32_t addr, uint32_t len) { return hal_flash_erase(addr, len); }
+__attribute__((weak)) bool hal_flash_erase_checked(uint32_t addr, uint32_t len) { return hal_flash_erase(addr, len); }
 
 /* Live config in RAM */
 static config_blob_t g_live;
@@ -52,23 +52,31 @@ void storage_init(void)
         if (!hal_flash_read(bank_addr(b), (uint8_t *)&tmp, sizeof(tmp))) {
             continue;
         }
+        /* F14: clamp size before computing CRC, otherwise a single
+         * flipped size byte reads past the in-RAM `tmp` buffer. */
+        if (tmp.size > CONFIG_PAYLOAD_MAX) { continue; }
         if (tmp.magic == CONFIG_MAGIC && tmp.version == CONFIG_VERSION) {
             uint32_t want = compute_crc32(tmp.payload, tmp.size);
             if (want == tmp.crc32) {
                 g_live = tmp;
-                g_dirty = false;
+                /* F3: actually bump boot_count so the field carries its
+                 * documented meaning (boot-time stamp / counter). The
+                 * caller is responsible for committing the new bank
+                 * later if it wants the count persisted. */
+                g_live.boot_count++;
+                g_dirty = (g_live.boot_count != tmp.boot_count);
                 return;
             }
         }
     }
     /* No valid bank — start fresh. */
-    g_live.magic   = CONFIG_MAGIC;
-    g_live.version = CONFIG_VERSION;
-    g_live.boot_count = 0U;
-    g_live.size    = 0U;
+    g_live.magic      = CONFIG_MAGIC;
+    g_live.version    = CONFIG_VERSION;
+    g_live.boot_count = 1U;          /* first boot */
+    g_live.size       = 0U;
     memset(g_live.payload, 0, sizeof(g_live.payload));
-    g_live.crc32   = 0U;
-    g_dirty        = true;  /* nothing to save yet */
+    g_live.crc32      = 0U;
+    g_dirty           = true;        /* save so the count persists */
 }
 
 config_blob_t *storage_edit(void)
@@ -87,6 +95,9 @@ void storage_revert(void)
 bool storage_commit(void)
 {
     if (!g_dirty) { return true; }
+    /* F14: refuse to compute CRC over an OOB payload (a corrupted flash
+     * byte could put size > CONFIG_PAYLOAD_MAX here). */
+    if (g_live.size > CONFIG_PAYLOAD_MAX) { return false; }
     /* Recompute CRC. */
     g_live.crc32 = compute_crc32(g_live.payload, g_live.size);
 
@@ -97,13 +108,14 @@ bool storage_commit(void)
         if (hal_flash_read(bank_addr(b), (uint8_t *)&probe, sizeof(probe))
             && probe.magic == CONFIG_MAGIC
             && probe.version == CONFIG_VERSION
+            && probe.size <= CONFIG_PAYLOAD_MAX     /* F14 */
             && probe.crc32 == compute_crc32(probe.payload, probe.size)) {
             target = (uint8_t)((b + 1U) % CONFIG_NUM_BANKS);
             break;
         }
     }
     uint32_t addr = bank_addr(target);
-    if (!hal_flash_rase_checked(addr, CONFIG_BANK_SIZE)) {
+    if (!hal_flash_erase_checked(addr, CONFIG_BANK_SIZE)) {
         return false;
     }
     if (!hal_flash_write(addr, (const uint8_t *)&g_live, sizeof(g_live))) {

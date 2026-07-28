@@ -20,7 +20,12 @@ ENTRY(_start)
 
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x08004000, LENGTH = 144K   /* app slot, 256K - 16K bootloader */
+    /* App slot: 0x08004000..0x08019FFF (88 KB) — see F5. Below this sits the
+     * 16 KB bootloader at 0x08000000; above it sits A/B config banks and
+     * bootloader-managed firmware metadata (0x08029F80..0x08029FAF).
+     * The previous overlap (FLASH ending 0x08028000 vs config at
+     * 0x0801A000) bricked storage on any non-trivial firmware build. */
+    FLASH (rx)  : ORIGIN = 0x08004000, LENGTH = 88K
     RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 64K
 }
 

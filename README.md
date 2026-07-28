@@ -577,3 +577,25 @@ This project is released under the **MIT License**. See [LICENSE](LICENSE) for d
 - **[wchisp](https://github.com/nicecoolwinter/wchisp)** — Open-source WCH ISP flash tool (Rust)
 - **[wlink](https://github.com/nicecoolwinter/wlink)** — Open-source WCH-Link debug tool (Rust)
 - **Sayobot community** — Protocol documentation and testing
+
+---
+
+## 🌐 Web Flasher (GitHub Pages)
+
+A browser-based firmware flasher is hosted at **GitHub Pages** — no installs needed.
+
+**Live URL:** `https://<your-username>.github.io/freya-control/`
+
+### Enable GitHub Pages
+
+1. Go to **Settings → Pages** in your repository
+2. Under **Source**, select **GitHub Actions**
+3. Push to `main` — the workflow deploys `docs/flasher/` automatically
+4. (Optional) Set a custom domain in `docs/flasher/CNAME`
+
+### Requirements
+
+- **Chrome 61+** or **Edge 79+** (WebUSB required)
+- **Windows:** Install WinUSB driver via [Zadig](https://zadig.akeo.ie/)
+- **Linux:** Add udev rule for VID `4348`
+- **macOS:** Works out of the box

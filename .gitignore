@@ -3,6 +3,7 @@ build/
 *.d
 *.elf
 *.bin
+!docs/flasher/firmware/*.bin
 *.hex
 *.map
 *.dSYM/
