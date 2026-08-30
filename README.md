@@ -187,7 +187,8 @@ make all
 wchisp flash --address 0x08004000 build/sayofw_o3c.bin
 ```
 
-**Step 3 — Verify and reboot:**
+**Step 3 — Verify and re
+oot:**
 
 ```bash
 # Unplug and replug the device (without holding BOOT0)
